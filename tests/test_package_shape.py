@@ -266,58 +266,64 @@ def test_a_checkout_without_artefacts_says_what_is_missing():
         assert flag in message, f"{flag} is not named in the message"
 
 
-def test_no_function_shadows_a_name_it_also_calls():
-    """The rename hazard that a passing import cannot see.
+def test_no_function_reads_a_module_level_name_it_later_rebinds():
+    """The rename hazard, detected by its actual condition.
 
-    `b48_fill_artifacts` became `fill_artifacts`, which is also what the caller
-    named the variable it assigned the result to:
+    Renaming produced this twice:
 
         fill_artifacts = fill_artifacts(labels_root)
+        preflight      = preflight(model, ...)
 
-    Python binds the local for the whole function body, so the call on the right
-    raises UnboundLocalError instead of reaching the import. The module still
-    imports cleanly; the failure waits until the function runs, which for the
-    trainer is after the gate, the checkpoint and the split have all loaded.
+    Python binds a local for the whole function body, so the name on the right
+    is the not-yet-assigned local, not the module-level one. The module imports
+    cleanly and every other test passes; the failure waits until the function
+    runs.
 
-    Python's own symbol table decides what counts as a local here, rather than a
-    guess about assignment.
+    An earlier version of this test only looked at *imported* names and so
+    missed the second case, where the shadowed function was defined in the same
+    module. This checks the real condition instead: a name bound at module level
+    is read inside a function at or before the first line that rebinds it.
     """
-    import symtable
-
     offenders = []
     for path in source_files():
         source = path.read_text()
-        imported = {
-            alias.asname or alias.name
-            for node in ast.walk(ast.parse(source))
-            if isinstance(node, ast.ImportFrom)
-            for alias in node.names
-        }
-        top = symtable.symtable(source, str(path), "exec")
+        tree = ast.parse(source)
 
-        def visit(table):
-            for child in table.get_children():
-                if child.get_type() == "function":
-                    called = {
-                        node.func.id
-                        for node in ast.walk(ast.parse(source))
-                        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-                    }
-                    for symbol in child.get_symbols():
-                        name = symbol.get_name()
-                        if (
-                            symbol.is_local()
-                            and symbol.is_assigned()
-                            and name in imported
-                            and name in called
-                        ):
-                            offenders.append(
-                                f"{path.relative_to(SOURCE)}: {child.get_name()}() "
-                                f"assigns to {name!r}, which it also imports and calls"
-                            )
-                visit(child)
+        # Everything resolvable at module scope: imports and top-level names.
+        module_level: set[str] = set()
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                module_level.add(node.name)
+            elif isinstance(node, ast.Assign):
+                module_level |= {t.id for t in node.targets if isinstance(t, ast.Name)}
+            elif isinstance(node, (ast.Import, ast.ImportFrom)):
+                module_level |= {a.asname or a.name.split(".")[0] for a in node.names}
 
-        visit(top)
+        functions = [
+            n for n in ast.walk(tree)
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+        ]
+        for function in functions:
+            first_store: dict[str, int] = {}
+            first_load: dict[str, int] = {}
+            for node in ast.walk(function):
+                if not isinstance(node, ast.Name):
+                    continue
+                where = first_store if isinstance(node.ctx, ast.Store) else first_load
+                where.setdefault(node.id, node.lineno)
+                where[node.id] = min(where[node.id], node.lineno)
+
+            for name, store_line in first_store.items():
+                if name not in module_level or name not in first_load:
+                    continue
+                # Same line counts: in `x = x(...)` the read is on the right and
+                # is evaluated first.
+                if first_load[name] <= store_line:
+                    offenders.append(
+                        f"{path.relative_to(SOURCE)}:{store_line} {function.name}() "
+                        f"rebinds {name!r}, which it reads at line {first_load[name]} "
+                        "-- that read hits the unassigned local, not the module-level name"
+                    )
     assert not offenders, "\n".join(offenders)
 
 

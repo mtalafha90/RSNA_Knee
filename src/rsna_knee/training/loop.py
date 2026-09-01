@@ -507,7 +507,11 @@ def train(
     clipped = [p for group in groups for p in group["params"]]
 
     optimizer.zero_grad(set_to_none=True)
-    preflight = preflight(model, runtime, train_dataset, multiplier_t, aux_weight, scaler)
+    # Named apart from the function, or the local binds for the whole body and
+    # the call on the right raises UnboundLocalError instead of reaching it.
+    preflight_report = preflight(
+        model, runtime, train_dataset, multiplier_t, aux_weight, scaler
+    )
     optimizer.zero_grad(set_to_none=True)
     if preflight_only:
         return None
@@ -595,7 +599,7 @@ def train(
                 # possible, so B53 records the measurement instead.
                 "augmentation_enabled": bool(augment),
                 "augmentation_policy": policy.to_dict(),
-                "augmentation_verified": preflight["augmentation"],
+                "augmentation_verified": preflight_report["augmentation"],
                 "slice_jitter": int(slice_jitter),
                 "changed_from_b52": {
                     "augmentation": [
