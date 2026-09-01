@@ -30,10 +30,40 @@ torch = pytest.importorskip("torch")
 
 ORIGINAL = os.environ.get("RSNA_KNEE_ORIGINAL", "")
 
-pytestmark = pytest.mark.skipif(
-    not ORIGINAL or not (Path(ORIGINAL) / "rsna_knee" / "b53_augmented_training.py").is_file(),
-    reason="set RSNA_KNEE_ORIGINAL to the original developments/src to compare",
-)
+# The module that has to be there for the comparison to mean anything. It is the
+# entry point of the code path this package was extracted from.
+ENTRY_POINT = "rsna_knee/b53_augmented_training.py"
+
+
+def _why_skip() -> str:
+    """Say what is actually wrong, not merely that something is.
+
+    A reason of "set RSNA_KNEE_ORIGINAL" is unhelpful to someone who has set it
+    and is watching the tests skip anyway.
+    """
+    if not ORIGINAL:
+        return (
+            "RSNA_KNEE_ORIGINAL is not set. Point it at the original "
+            "developments/src to compare this package against it."
+        )
+    root = Path(ORIGINAL)
+    if not root.is_dir():
+        return f"RSNA_KNEE_ORIGINAL={ORIGINAL} is not a directory"
+    if not (root / "rsna_knee").is_dir():
+        return (
+            f"{root} has no rsna_knee/ package. RSNA_KNEE_ORIGINAL should end in "
+            "developments/src, not the repository root."
+        )
+    if not (root / ENTRY_POINT).is_file():
+        return (
+            f"{root / ENTRY_POINT} is missing, so that checkout predates the code "
+            "this package was extracted from. Run `git pull` in it."
+        )
+    return ""
+
+
+SKIP_REASON = _why_skip()
+pytestmark = pytest.mark.skipif(bool(SKIP_REASON), reason=SKIP_REASON)
 
 CROP_POLICY = {"crop_fraction": 0.90, "policy": "b20_crop_focus_v1"}
 
