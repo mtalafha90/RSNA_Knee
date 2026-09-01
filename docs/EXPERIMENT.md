@@ -180,9 +180,9 @@ prefetch_factor: 2
 ```
 
 **It changes throughput and nothing else**, which matters because the baseline
-above was measured at `0`. Two design decisions make that true, and
-`tests/test_loader_workers.py` checks both by running a real loader at 0 and at
-2 workers and comparing the studies and their pixels:
+above was measured at `0`. Three design decisions make that true. Two of them
+`tests/test_loader_workers.py` checks by running a real loader at 0 and at 2
+workers and comparing the studies and their pixels:
 
 * the shuffle order comes from an explicitly seeded generator, not the global
   random state, so every worker count visits studies in the same order;
@@ -190,8 +190,44 @@ above was measured at `0`. Two design decisions make that true, and
   index, so workers cannot inherit copies of one stream and hand out the same
   "random" numbers.
 
+The third is how tensors cross between processes, and it is there because the
+first run at `num_workers: 6` trained a whole epoch and then died at the first
+validation pass:
+
+```text
+File ".../torch/multiprocessing/reductions.py", rebuild_storage_fd
+RuntimeError: received 0 items of ancdata
+```
+
+That is the process running out of file descriptors, not a fault in the data.
+A study item here is a *list* of per-series tensors, so one batch is a dozen or
+more separate shared allocations, and under the Linux default every one of them
+travels as an open descriptor. Enough batches in flight across enough workers
+and the limit is reached -- which is why it struck at validation rather than at
+startup. Each worker now shares by named shared-memory file instead, and the
+run raises its own soft descriptor limit as well. The log states both:
+
+```text
+workers=6 | sharing=file_system | open_files=1048576
+```
+
+`tests/test_worker_file_descriptors.py` runs a real loader under a deliberately
+small limit, in two arms: the package's worker setup must survive it, and the
+setup from before the fix must not. The second arm is what stops the first from
+quietly becoming a test that 200 items load.
+
+The one cost of the change: a hard kill can leave stray files in `/dev/shm`.
+
+`num_workers: 0` is left exactly as it was -- it shares nothing between
+processes, so neither setting applies, and the run that produced the baseline
+above stays reproducible.
+
 Each worker is a separate process under `spawn` and costs host RAM. Preflight
 after changing it and read the reported `rss`.
+
+Whether the extra workers earn their keep is a separate question from whether
+they are safe. If `nvidia-smi` already shows the card near 100% busy, the CPU is
+not the constraint and more workers will buy little.
 
 ## Governance
 

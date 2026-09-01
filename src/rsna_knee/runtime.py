@@ -38,8 +38,49 @@ def supports_bfloat16(device: torch.device | None = None) -> bool:
         return False
 
 
+def share_tensors_by_file() -> str:
+    """Hand tensors between processes as shared-memory files, not file descriptors.
+
+    A study item is a list of per-series tensors, so one batch is a dozen or more
+    separate shared allocations. Under the Linux default (`file_descriptor`) each
+    one travels as an open file descriptor, and several batches in flight across
+    several workers overrun the process limit. The receiving end then fails with
+    `RuntimeError: received 0 items of ancdata`, typically hours in, at the first
+    validation pass rather than at startup.
+
+    `file_system` names the shared memory instead of passing a descriptor, so the
+    count no longer scales with tensors in flight. The cost is that a hard kill
+    (SIGKILL, an OOM) can leave stray files in `/dev/shm`.
+    """
+    if "file_system" in torch.multiprocessing.get_all_sharing_strategies():
+        torch.multiprocessing.set_sharing_strategy("file_system")
+    return str(torch.multiprocessing.get_sharing_strategy())
+
+
+def relax_file_descriptor_limit() -> tuple[int, int]:
+    """Raise the soft open-file limit to the hard limit. Returns (before, after)."""
+    try:
+        import resource
+    except ImportError:  # not a POSIX host
+        return (0, 0)
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    target = max(soft, 65536) if hard == resource.RLIM_INFINITY else hard
+    if target <= soft:
+        return (int(soft), int(soft))
+    try:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (target, hard))
+    except (ValueError, OSError):
+        return (int(soft), int(soft))
+    return (int(soft), int(target))
+
+
 def seed_worker(worker_id: int) -> None:
-    """Deterministically seed Python/NumPy inside each DataLoader process."""
+    """Deterministically seed Python/NumPy inside each DataLoader process.
+
+    Also sets the sharing strategy, because the worker is the process that sends
+    the tensors and PyTorch does not inherit the parent's choice under `spawn`.
+    """
+    share_tensors_by_file()
     seed = int(torch.initial_seed() % (2**32))
     random.seed(seed)
     np.random.seed(seed)
@@ -58,6 +99,8 @@ class RuntimeConfig:
     visible_gpus: int
     device_name: str
     multiprocessing_context: str | None
+    sharing_strategy: str | None = None
+    open_file_limit: int = 0
 
     @property
     def is_main(self) -> bool:
@@ -81,11 +124,14 @@ class RuntimeConfig:
 
     def describe(self) -> str:
         precision = {torch.bfloat16: "bf16", torch.float16: "fp16", None: "fp32"}[self.amp_dtype]
-        return (
+        line = (
             f"device={self.device_name} | single-gpu | precision={precision} | "
             f"workers={self.num_workers} | pin_memory={self.pin_memory} | "
             f"visible_gpus={self.visible_gpus}"
         )
+        if self.num_workers > 0:
+            line += f" | sharing={self.sharing_strategy} | open_files={self.open_file_limit}"
+        return line
 
     def loader_kwargs(self, *, seed: int | None = None) -> dict:
         kwargs = {
@@ -169,17 +215,24 @@ def resolve_runtime(config: dict | None = None) -> RuntimeConfig:
         raise ValueError("multiprocessing_context must be spawn, fork, forkserver, or null")
 
     pin_memory = bool(config.get("pin_memory", use_cuda)) and use_cuda
+    workers = default_workers(config.get("num_workers"))
+    # Only with workers is anything shared between processes, so a single-process
+    # run keeps the stock settings and stays comparable with the earlier baseline.
+    strategy = share_tensors_by_file() if workers > 0 else None
+    open_files = relax_file_descriptor_limit()[1] if workers > 0 else 0
     return RuntimeConfig(
         device=device,
         amp_dtype=amp_dtype,
         use_scaler=use_scaler,
-        num_workers=default_workers(config.get("num_workers")),
+        num_workers=workers,
         pin_memory=pin_memory,
         persistent_workers=bool(config.get("persistent_workers", True)),
         prefetch_factor=prefetch,
         visible_gpus=visible,
         device_name=name,
         multiprocessing_context=context,
+        sharing_strategy=strategy,
+        open_file_limit=open_files,
     )
 
 

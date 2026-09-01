@@ -23,7 +23,7 @@ jobs:
       # union of its sources' imports, and one __all__ still named a symbol
       # that had moved -- neither of which any test would have caught.
       - name: Lint
-        run: python -m pyflakes src/rsna_knee/
+        run: python -m pyflakes src/rsna_knee/ tests/
 
       - name: Test
         run: pytest

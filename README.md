@@ -139,3 +139,8 @@ a reader which frozen contract just refused them.
   code is here and proven identical to its source; no result exists.
 - **Artefacts not included.** The data, labels, series policy, base checkpoint
   and split live outside the repository.
+- **No resume.** A run is about a day long, and an interruption costs all of it.
+  The first checkpoint is written only when the first validation improves on
+  nothing, so a crash before that point leaves no file at all. Restarting also
+  needs the output directory cleared, because the trainer refuses to overwrite
+  an existing `best_model.pt` rather than silently replacing a result.

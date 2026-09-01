@@ -12,6 +12,8 @@ not look in. These tests pin that the diagnostic tells them apart.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from rsna_knee.data.coverage import (
