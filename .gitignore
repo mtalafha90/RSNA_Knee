@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+.venv/
+# Anchored to the repository root: `data/` alone would also ignore
+# src/rsna_knee/data/, which is the package.
+/runs/
+/data/
+*.pt

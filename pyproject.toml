@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rsna-knee"
+version = "1.0.0"
+description = "Knee MRI abnormality detection: twelve findings per study, macro ROC AUC"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.0",
+    "pydicom>=2.4",
+    "PyYAML>=6.0",
+    "torch>=2.2",
+    "torchvision>=0.17",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0", "scikit-learn>=1.3"]
+
+[project.scripts]
+rsna-knee-train = "rsna_knee.training.loop:main"
+rsna-knee-coverage = "rsna_knee.data.coverage:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
