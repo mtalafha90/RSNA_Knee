@@ -264,3 +264,99 @@ def test_a_checkout_without_artefacts_says_what_is_missing():
     for flag in ("--data-root", "--labels-root", "--series-policy",
                  "--base-checkpoint", "--domain-split"):
         assert flag in message, f"{flag} is not named in the message"
+
+
+def test_no_function_shadows_a_name_it_also_calls():
+    """The rename hazard that a passing import cannot see.
+
+    `b48_fill_artifacts` became `fill_artifacts`, which is also what the caller
+    named the variable it assigned the result to:
+
+        fill_artifacts = fill_artifacts(labels_root)
+
+    Python binds the local for the whole function body, so the call on the right
+    raises UnboundLocalError instead of reaching the import. The module still
+    imports cleanly; the failure waits until the function runs, which for the
+    trainer is after the gate, the checkpoint and the split have all loaded.
+
+    Python's own symbol table decides what counts as a local here, rather than a
+    guess about assignment.
+    """
+    import symtable
+
+    offenders = []
+    for path in source_files():
+        source = path.read_text()
+        imported = {
+            alias.asname or alias.name
+            for node in ast.walk(ast.parse(source))
+            if isinstance(node, ast.ImportFrom)
+            for alias in node.names
+        }
+        top = symtable.symtable(source, str(path), "exec")
+
+        def visit(table):
+            for child in table.get_children():
+                if child.get_type() == "function":
+                    called = {
+                        node.func.id
+                        for node in ast.walk(ast.parse(source))
+                        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                    }
+                    for symbol in child.get_symbols():
+                        name = symbol.get_name()
+                        if (
+                            symbol.is_local()
+                            and symbol.is_assigned()
+                            and name in imported
+                            and name in called
+                        ):
+                            offenders.append(
+                                f"{path.relative_to(SOURCE)}: {child.get_name()}() "
+                                f"assigns to {name!r}, which it also imports and calls"
+                            )
+                visit(child)
+
+        visit(top)
+    assert not offenders, "\n".join(offenders)
+
+
+def test_the_trainer_reaches_its_first_artefact_check():
+    """Walk `train()` far enough to prove its early body executes.
+
+    It cannot be run to completion here: the label export must have exactly
+    4,349 rows and match a pinned Phase-8 fingerprint, and the base checkpoint
+    must carry a recorded arm. Those cannot be fabricated, and fabricating them
+    would defeat their purpose.
+
+    What this does establish is that `train()` is entered, its arguments are
+    validated, and it fails where a missing gate should make it fail -- rather
+    than on a NameError or an UnboundLocalError in code that was never executed.
+    """
+    from rsna_knee.training.loop import train
+
+    with pytest.raises(FileNotFoundError, match="selection gate"):
+        train(
+            {"b37_grid_size": 6, "b37_top_k": 8},
+            data_root="/nonexistent-data",
+            labels_root="/nonexistent-labels",
+            series_policy_path="/nonexistent-policy.json",
+            base_checkpoint="/nonexistent-base.pt",
+            domain_split="/nonexistent-gate",
+            epochs=1,
+        )
+
+
+def test_the_trainer_validates_its_arguments_before_touching_disk():
+    """A bad epoch count or stage count should not cost a checkpoint load."""
+    from rsna_knee.training.loop import train
+
+    common = dict(
+        data_root="/nonexistent", labels_root="/nonexistent",
+        series_policy_path="/nonexistent", base_checkpoint="/nonexistent",
+        domain_split="/nonexistent",
+    )
+    with pytest.raises(ValueError, match="at least one epoch"):
+        train({}, epochs=0, **common)
+    with pytest.raises(ValueError, match="stages must be"):
+        train({}, epochs=1, encoder_trainable_stages=99, **common)

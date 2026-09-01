@@ -364,7 +364,10 @@ def train(
     ) != expected_train_sha:
         raise ValueError("domain split source train.csv fingerprint mismatch")
 
-    fill_artifacts = fill_artifacts(labels_root)
+    # Named apart from the function that produces it: `fill_artifacts =
+    # fill_artifacts(...)` binds the local before the call is evaluated, so
+    # Python raises UnboundLocalError rather than calling the import.
+    fill_artifact_shas = fill_artifacts(labels_root)
     (
         _train,
         all_uids,
@@ -624,7 +627,7 @@ def train(
                 "label_confidence": confidence,
                 "fill_policy": fill_policy,
                 "fill_audit": fill_audit,
-                "fill_artifacts": fill_artifacts,
+                "fill_artifacts": fill_artifact_shas,
                 "supervision": supervision,
                 "series_policy_signature": FROZEN_SERIES_SIGNATURE,
                 "metadata_repair": metadata_stats,
