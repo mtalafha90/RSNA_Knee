@@ -166,6 +166,33 @@ fingerprint, the base checkpoint by its recorded arm and endpoint, the split by
 the SHA-256 of the `train.csv` it was built from, and the data by counting how
 many studies actually have readable series.
 
+## Feeding the GPU
+
+`num_workers: 0` in `config/training.yaml` decodes DICOM and applies all seven
+augmentations on the main thread, between GPU steps, so a fast card waits for
+the CPU. Augmentation makes that worse than it was without it.
+
+Raising it is safe:
+
+```yaml
+num_workers: 6
+prefetch_factor: 2
+```
+
+**It changes throughput and nothing else**, which matters because the baseline
+above was measured at `0`. Two design decisions make that true, and
+`tests/test_loader_workers.py` checks both by running a real loader at 0 and at
+2 workers and comparing the studies and their pixels:
+
+* the shuffle order comes from an explicitly seeded generator, not the global
+  random state, so every worker count visits studies in the same order;
+* the augmentation draws from a generator keyed by run seed, epoch and study
+  index, so workers cannot inherit copies of one stream and hand out the same
+  "random" numbers.
+
+Each worker is a separate process under `spawn` and costs host RAM. Preflight
+after changing it and read the reported `rss`.
+
 ## Governance
 
 Like the runs it is measured against, this selects its checkpoint on a held-out
