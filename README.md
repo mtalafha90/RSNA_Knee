@@ -18,7 +18,14 @@ rsna-knee-train \
   --epochs 6 --all-data --preflight-only
 ```
 
-Drop `--preflight-only` to train.
+Drop `--preflight-only` to train. `docs/EXPERIMENT.md` says what the run
+changes, what it is measured against, and how to read the result.
+
+The five paths above are artefacts this repository does not carry — they are
+large and unchanged. The run verifies each before spending a GPU: the series
+policy by fingerprint, the base checkpoint by its recorded endpoint, the split
+by the SHA-256 of the `train.csv` it was built from, and the data by counting
+how many studies actually have readable series.
 
 ## What the model is
 
@@ -124,5 +131,7 @@ a reader which frozen contract just refused them.
 - **No submission path.** Every inference launcher in the archive pins a
   specific checkpoint by SHA-256, and none of them names a checkpoint this
   trainer produces. A run from here cannot be submitted until a launcher pins it.
-- **Untrained.** The training regime here is measured; this exact package has
-  not itself produced a result yet.
+- **Untrained.** The experiment in `docs/EXPERIMENT.md` has not been run. The
+  code is here and proven identical to its source; no result exists.
+- **Artefacts not included.** The data, labels, series policy, base checkpoint
+  and split live outside the repository.
