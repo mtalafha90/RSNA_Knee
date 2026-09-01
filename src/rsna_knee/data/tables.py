@@ -21,8 +21,10 @@ def backfill_series_metadata(
     limit: int | None = None,
 ) -> tuple[pd.DataFrame, dict[str, int]]:
     """Independently repair missing plane, fluid and fat-suppression metadata."""
-    from .dicom import find_series_dir
-    from .dicom_meta import read_series_metadata
+    # Imported here rather than at module scope so reading the CSV tables does
+    # not pull in the DICOM stack for a caller that only wants the tables.
+    from ..imaging.dicom_io import find_series_dir
+    from ..imaging.dicom_metadata import read_series_metadata
 
     df = series_df.copy()
     missing_plane = df["Anatomical_Plane"].astype(str).str.strip().eq("")

@@ -5,27 +5,31 @@ Twelve binary findings per knee MRI study, scored as macro ROC AUC.
 ```bash
 pip install -e ".[test]"
 
-rsna-knee-coverage --data-root /path/to/data          # is the data here?
+# Once: put the five artefacts a run needs into artefacts/
+./scripts/setup_artefacts.sh /path/to/CNN_CPC /path/to/competition-data
 
-rsna-knee-train \
-  --config config/training.yaml \
-  --data-root       /path/to/rsna-knee-abnormality-detection \
-  --labels-root     /path/to/merged_label_export \
-  --series-policy   /path/to/series_policy.json \
-  --base-checkpoint /path/to/base_model.pt \
-  --domain-split    /path/to/scanner_split \
-  --out-root        runs/augmented_training \
-  --epochs 6 --all-data --preflight-only
+rsna-knee-coverage --data-root artefacts/data       # is the data here?
+rsna-knee-train --epochs 6 --all-data --preflight-only
+rsna-knee-train --epochs 6 --all-data
 ```
+
+Every path defaults into `artefacts/`, so a set-up checkout needs no flags. Pass
+`--data-root`, `--labels-root`, `--series-policy`, `--base-checkpoint` or
+`--domain-split` to override any one of them.
+
+The four small artefacts are copied, so a checkout is self-contained and a later
+change in the archive cannot alter a run already under way. The dataset is
+symlinked — far too large to duplicate, and it never changes. None of them is in
+git.
 
 Drop `--preflight-only` to train. `docs/EXPERIMENT.md` says what the run
 changes, what it is measured against, and how to read the result.
 
-The five paths above are artefacts this repository does not carry — they are
-large and unchanged. The run verifies each before spending a GPU: the series
-policy by fingerprint, the base checkpoint by its recorded endpoint, the split
-by the SHA-256 of the `train.csv` it was built from, and the data by counting
-how many studies actually have readable series.
+The run verifies each artefact before spending a GPU: the series policy by
+fingerprint, the base checkpoint by its recorded endpoint, the split by the
+SHA-256 of the `train.csv` it was built from, and the data by counting how many
+studies actually have readable series. A checkout missing any of them gets one
+message naming all of them, rather than failing on them one at a time.
 
 ## What the model is
 

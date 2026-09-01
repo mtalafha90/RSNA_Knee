@@ -105,10 +105,9 @@ def load_selection_gate(path: str | Path) -> tuple[dict, "pd.DataFrame", dict]:
     """
     import pandas as pd
 
-    from .b50_ordered_slice_selection_split import (
-        SPLIT_EXCLUDED,
-        verify_selection_split,
-    )
+    # SPLIT_EXCLUDED and verify_selection_split are defined in this module.
+    # They used to live in a separate one and were imported here lazily to
+    # break a cycle that no longer exists.
 
     directory = Path(path)
     if directory.is_file():

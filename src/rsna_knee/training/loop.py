@@ -46,6 +46,55 @@ CHECKPOINT_NAME = "best_model.pt"
 # B53 changes one thing against B52 and inherits every other value from it.
 DEFAULT_EPOCHS = 6
 
+# Where a checkout keeps the artefacts a run needs. They are large and unchanged,
+# so they are not in git -- but they always live in the same place, and typing
+# five paths on every run is how one of them silently ends up wrong.
+#
+# `data` is normally a symlink: the dataset is far too large to copy per
+# checkout, and it never changes.
+ARTEFACTS = "artefacts"
+DEFAULT_CONFIG = "config/training.yaml"
+DEFAULT_DATA_ROOT = f"{ARTEFACTS}/data"
+DEFAULT_LABELS_ROOT = f"{ARTEFACTS}/labels"
+DEFAULT_SERIES_POLICY = f"{ARTEFACTS}/series_policy.json"
+DEFAULT_BASE_CHECKPOINT = f"{ARTEFACTS}/base_model.pt"
+DEFAULT_DOMAIN_SPLIT = f"{ARTEFACTS}/split"
+
+
+def require_artefacts(arguments) -> None:
+    """Say which artefact is missing and where it belongs, all at once.
+
+    argparse's `required=True` would force all five onto every command line.
+    Defaulting them instead means a set-up checkout runs with no paths at all,
+    and a checkout that is not set up gets one message naming everything it
+    still needs rather than failing on them one at a time.
+    """
+    from pathlib import Path as _Path
+
+    expected = [
+        ("--config", arguments.config, "the frozen geometry contract"),
+        ("--data-root", arguments.data_root, "train.csv, train_series.csv and the DICOM folders"),
+        ("--labels-root", arguments.labels_root, "training_targets.csv, policy.json, audit.json"),
+        ("--series-policy", arguments.series_policy, "series_policy.json"),
+        ("--base-checkpoint", arguments.base_checkpoint, "the pretrained base model"),
+        ("--domain-split", arguments.domain_split, "the scanner-grouped split directory"),
+    ]
+    missing = [(flag, value, what) for flag, value, what in expected if not _Path(value).exists()]
+    if not missing:
+        return
+
+    lines = ["missing artefacts, so this run cannot start:", ""]
+    for flag, value, what in missing:
+        lines.append(f"  {flag:<19} {value}")
+        lines.append(f"  {'':19} expected: {what}")
+    lines += [
+        "",
+        f"Either pass the flag, or put the artefact at the path shown. The {ARTEFACTS}/",
+        "layout is what the README's setup section creates; docs/EXPERIMENT.md",
+        "describes what each one is.",
+    ]
+    raise SystemExit("\n".join(lines))
+
 
 # The B52 numbers B53 is measured against, on the same 548 unseen-scanner
 # studies. Selection statistics, not effect sizes.
@@ -617,12 +666,13 @@ def train(
 
 def main() -> None:
     parser = argparse.ArgumentParser("Train the knee MRI model with augmentation applied")
-    parser.add_argument("--config", default="config/b42_constant_area_aspect_sparse.yaml")
-    parser.add_argument("--data-root", required=True)
-    parser.add_argument("--labels-root", required=True)
-    parser.add_argument("--series-policy", required=True)
-    parser.add_argument("--base-checkpoint", required=True)
-    parser.add_argument("--domain-split", required=True)
+    # Defaults, not requirements: see require_artefacts above.
+    parser.add_argument("--config", default=DEFAULT_CONFIG)
+    parser.add_argument("--data-root", default=DEFAULT_DATA_ROOT)
+    parser.add_argument("--labels-root", default=DEFAULT_LABELS_ROOT)
+    parser.add_argument("--series-policy", default=DEFAULT_SERIES_POLICY)
+    parser.add_argument("--base-checkpoint", default=DEFAULT_BASE_CHECKPOINT)
+    parser.add_argument("--domain-split", default=DEFAULT_DOMAIN_SPLIT)
     parser.add_argument("--epochs", type=int, default=DEFAULT_EPOCHS)
     parser.add_argument(
         "--encoder-stages", type=int, default=DEFAULT_ENCODER_STAGES,
@@ -657,6 +707,7 @@ def main() -> None:
     parser.add_argument("--out-root", default=DEFAULT_RUN_ROOT)
     parser.add_argument("--preflight-only", action="store_true")
     args = parser.parse_args()
+    require_artefacts(args)
 
     train(
         read_config(args.config),

@@ -9,4 +9,6 @@ dist/
 # src/rsna_knee/data/, which is the package.
 /runs/
 /data/
+# The five artefacts a run needs: too large for git, and unchanged.
+/artefacts/
 *.pt

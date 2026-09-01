@@ -165,3 +165,102 @@ def test_the_config_keys_the_code_reads_still_exist():
 def test_the_command_line_entry_points_have_a_main(entry):
     module = importlib.import_module(entry)
     assert callable(getattr(module, "main", None)), f"{entry} has no main()"
+
+
+def test_every_relative_import_resolves_to_a_module_that_exists():
+    """Including the lazy ones, which `import the module` cannot reach.
+
+    A `from .x import y` inside a function only executes when that function is
+    called, so a module can import perfectly while carrying an import that will
+    fail an hour into a run. The migration copied function bodies verbatim, and
+    three such imports still named modules that no longer exist -- two of them
+    in a function the trainer calls on every run.
+    """
+    offenders = []
+    for path in source_files():
+        package = path.relative_to(SOURCE).parent.parts
+        for node in ast.walk(ast.parse(path.read_text())):
+            if not isinstance(node, ast.ImportFrom) or not node.level:
+                continue
+            # level 1 is this package, level 2 is its parent, and so on.
+            base = list(package)[: len(package) - (node.level - 1)] if node.level > 1 else list(package)
+            target = base + (node.module.split(".") if node.module else [])
+            module = SOURCE.joinpath(*target).with_suffix(".py")
+            package_init = SOURCE.joinpath(*target, "__init__.py")
+            if not module.is_file() and not package_init.is_file():
+                offenders.append(
+                    f"{path.relative_to(SOURCE)}:{node.lineno} -> "
+                    f"{'.' * node.level}{node.module or ''} (no such module)"
+                )
+    assert not offenders, "\n".join(offenders)
+
+
+def test_the_lazy_imports_actually_execute():
+    """The behavioural half: call the functions that carry a deferred import.
+
+    The structural test above would miss an import that resolves to a real
+    module but asks it for a name it does not have.
+    """
+    import pandas as pd
+
+    from rsna_knee.data.splits import load_selection_gate
+    from rsna_knee.data.tables import backfill_series_metadata
+
+    # Each must reach its own error or return, not an ImportError.
+    with pytest.raises(FileNotFoundError):
+        load_selection_gate("/nonexistent-gate")
+
+    frame = pd.DataFrame([{
+        "StudyInstanceUID": "s", "SeriesInstanceUID": "x",
+        "Anatomical_Plane": "", "Fluid_Sensitive": None, "Fat_Suppression": None,
+    }])
+    _repaired, stats = backfill_series_metadata(frame, "/nonexistent-data", split="train")
+    assert stats["rows_needing_metadata"] == 1
+
+
+def test_the_artefact_defaults_are_consistent():
+    """A default that names a file the setup script never creates is a trap."""
+    from rsna_knee.training import loop
+
+    assert loop.DEFAULT_CONFIG == "config/training.yaml"
+    assert Path(loop.DEFAULT_CONFIG).parts[0] == "config"
+    for default in (
+        loop.DEFAULT_DATA_ROOT, loop.DEFAULT_LABELS_ROOT, loop.DEFAULT_SERIES_POLICY,
+        loop.DEFAULT_BASE_CHECKPOINT, loop.DEFAULT_DOMAIN_SPLIT,
+    ):
+        assert default.startswith(loop.ARTEFACTS + "/"), f"{default} is outside {loop.ARTEFACTS}/"
+
+    setup = (Path(__file__).resolve().parents[1] / "scripts" / "setup_artefacts.sh").read_text()
+    for default in (
+        loop.DEFAULT_LABELS_ROOT, loop.DEFAULT_SERIES_POLICY,
+        loop.DEFAULT_BASE_CHECKPOINT, loop.DEFAULT_DOMAIN_SPLIT, loop.DEFAULT_DATA_ROOT,
+    ):
+        assert default in setup, f"setup_artefacts.sh never creates {default}"
+
+
+def test_a_checkout_without_artefacts_says_what_is_missing():
+    """argparse's required=True would force five paths onto every command line.
+
+    Defaulting them means a set-up checkout runs bare -- and a checkout that is
+    not set up must get one message naming everything it needs, not fail on
+    them one at a time.
+    """
+    from rsna_knee.training import loop
+
+    arguments = loop.build_argument_parser().parse_args([]) if hasattr(
+        loop, "build_argument_parser"
+    ) else None
+    if arguments is None:  # the parser is built inside main()
+        import argparse
+
+        arguments = argparse.Namespace(
+            config="nope.yaml", data_root="nope", labels_root="nope",
+            series_policy="nope", base_checkpoint="nope", domain_split="nope",
+        )
+    with pytest.raises(SystemExit) as caught:
+        loop.require_artefacts(arguments)
+
+    message = str(caught.value)
+    for flag in ("--data-root", "--labels-root", "--series-policy",
+                 "--base-checkpoint", "--domain-split"):
+        assert flag in message, f"{flag} is not named in the message"
