@@ -1,22 +1,6 @@
 """The twelve findings, and the vocabulary shared across the package."""
 from __future__ import annotations
 
-from pathlib import Path
-from torch import nn
-from torch.utils.checkpoint import checkpoint
-from torch.utils.data import DataLoader
-from typing import Any, Sequence
-from typing import Iterable
-import argparse
-import hashlib
-import json
-import numpy as np
-import pandas as pd
-import re
-import time
-import torch
-import unicodedata
-import yaml
 
 
 DEFAULT_SEED = 2026

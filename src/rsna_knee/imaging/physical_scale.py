@@ -1,12 +1,9 @@
 """Resampling to a common physical scale, so a millimetre means the same thing on every scanner."""
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Iterable
 import hashlib
 import json
 import numpy as np
-import pandas as pd
 import torch
 import torch.nn.functional as F
 

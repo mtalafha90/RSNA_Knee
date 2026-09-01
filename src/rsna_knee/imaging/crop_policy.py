@@ -1,18 +1,7 @@
 """The frozen crop: 90% of the native matrix, centred."""
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
-from torch import nn
-from torch.utils.checkpoint import checkpoint
-from torch.utils.data import DataLoader
-import argparse
-import json
-import math
 import numpy as np
-import time
-import torch
-import torch.nn.functional as F
 
 
 CROP_FRACTION = 0.90

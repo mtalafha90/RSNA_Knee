@@ -1,7 +1,6 @@
 """Target-specific top-k pooling over a grid of local evidence."""
 from __future__ import annotations
 
-from dataclasses import dataclass
 from torch import nn
 import math
 import torch

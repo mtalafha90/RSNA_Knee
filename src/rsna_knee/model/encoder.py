@@ -1,17 +1,9 @@
 """The slice encoder that reads pixels, and which of its stages are allowed to learn."""
 from __future__ import annotations
 
-from pathlib import Path
 from torch import nn
-from torch.utils.checkpoint import checkpoint
-from torch.utils.data import DataLoader
 from torchvision.models import ConvNeXt_Tiny_Weights, convnext_tiny
-import argparse
 import hashlib
-import json
-import math
-import numpy as np
-import time
 import torch
 import torch.nn.functional as F
 

@@ -1,16 +1,8 @@
 """Macro ROC AUC over the cells the reports actually supervise."""
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
-from torch.utils.data import DataLoader
-import argparse
-import json
 import numpy as np
-import pandas as pd
-import time
 import torch
-import yaml
 
 from .constants import TARGETS
 from .training.losses import move_study_to_device, study_losses

@@ -15,8 +15,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install -e ".[test]"
+          pip install pyflakes
       # Every test, discovered. The archive this came from listed its test files
       # by hand in the workflow, so a new suite ran only if someone remembered
       # to add it -- and several never did.
+      # Undefined names and dead imports. The migration gave every module the
+      # union of its sources' imports, and one __all__ still named a symbol
+      # that had moved -- neither of which any test would have caught.
+      - name: Lint
+        run: python -m pyflakes src/rsna_knee/
+
       - name: Test
         run: pytest

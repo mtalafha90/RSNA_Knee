@@ -3,11 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 from torch.utils.data import DataLoader
-from torchvision.transforms import InterpolationMode
-from torchvision.transforms import functional as TVF
 import argparse
 import json
-import math
 import numpy as np
 import time
 import torch
@@ -180,7 +177,6 @@ __all__ = [
     "CHECKPOINT_NAME",
     "DEFAULT_EPOCHS",
     "AugmentationPolicy",
-    "augment_series",
     "AugmentedStudyDataset",
     "verify_augmentation_reaches_pixels",
     "preflight",

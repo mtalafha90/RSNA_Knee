@@ -1,12 +1,9 @@
 """Choosing which slices represent a series, and the position features that describe them."""
 from __future__ import annotations
 
-from dataclasses import dataclass
-from torch import nn
 import math
 import numpy as np
 import torch
-import torch.nn.functional as F
 
 from ..imaging.dicom_io import _centers
 

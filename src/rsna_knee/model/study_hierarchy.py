@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from torch import nn
 from torch.utils.checkpoint import checkpoint
-import copy
 import math
 import torch
 import torch.nn.functional as F

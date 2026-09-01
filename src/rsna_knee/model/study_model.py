@@ -4,7 +4,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from torch import nn
 from torch.utils.checkpoint import checkpoint
-import math
 import numpy as np
 import torch
 import torch.nn.functional as F

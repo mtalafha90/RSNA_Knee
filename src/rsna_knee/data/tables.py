@@ -3,11 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Iterable
-import hashlib
 import numpy as np
 import pandas as pd
-import re
-import unicodedata
 
 from ..constants import PLANES, TARGETS
 from ..imaging.dicom_io import find_series_dir
@@ -21,11 +18,6 @@ def backfill_series_metadata(
     limit: int | None = None,
 ) -> tuple[pd.DataFrame, dict[str, int]]:
     """Independently repair missing plane, fluid and fat-suppression metadata."""
-    # Imported here rather than at module scope so reading the CSV tables does
-    # not pull in the DICOM stack for a caller that only wants the tables.
-    from ..imaging.dicom_io import find_series_dir
-    from ..imaging.dicom_metadata import read_series_metadata
-
     df = series_df.copy()
     missing_plane = df["Anatomical_Plane"].astype(str).str.strip().eq("")
     missing_fluid = df["Fluid_Sensitive"].isna()

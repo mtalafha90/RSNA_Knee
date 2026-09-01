@@ -1,13 +1,6 @@
 """The per-study loss, and moving one study onto the device."""
 from __future__ import annotations
 
-from pathlib import Path
-from torch import nn
-from torch.utils.data import DataLoader
-import argparse
-import json
-import numpy as np
-import time
 import torch
 
 from ..runtime import autocast

@@ -1,9 +1,6 @@
 """Turning a volume into the model's input: slice centres, 2.5D triplets, one constant-area resize."""
 from __future__ import annotations
 
-from dataclasses import dataclass
-from torch import nn
-from torch.utils.checkpoint import checkpoint
 import math
 import numpy as np
 import torch
