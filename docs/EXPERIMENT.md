@@ -105,6 +105,28 @@ trained encoder + finishing cosine    0.802666   1,447 training studies
 trained encoder + finishing cosine    0.834998   3,801 training studies
 ```
 
+The 3,801-study baseline is complete: six epochs, 26.9 hours, best at epoch 5.
+
+```text
+epoch   train      validation   macro AUC
+  1     1.124810   1.075395     0.777063
+  2     1.054743   1.028828     0.815093
+  3     1.002861   1.049431     0.832568
+  4     0.965207   1.013574     0.828500
+  5     0.928085   1.010989     0.834998   <- selected
+  6     0.903380   1.015765     0.833541
+```
+
+**That baseline is the reason to run this experiment.** Its last four epochs
+span `0.0065`, so it has flattened rather than turned over. Train loss kept
+falling the whole way, `-0.221` end to end, while validation loss went flat
+after epoch 2 and validation AUC went flat with it. A model that keeps fitting
+the training data while the held-out score stops moving is memorising, and more
+epochs at these settings will not help.
+
+Memorisation on a few thousand studies is what augmentation is for -- and that
+run had none, whatever its own log said.
+
 Those are **selection statistics** — each is the best of several epochs on the
 very surface used to choose the epoch, so each is optimistically biased by
 construction. They are comparable with each other and with this run, and with
