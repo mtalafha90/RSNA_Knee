@@ -178,9 +178,32 @@ def prepare_series_triplets(
     crop_fraction: float = CROP_FRACTION,
 ) -> tuple[torch.Tensor, np.ndarray]:
     """Return 32 native-aspect B42 triplets at approximately constant pixel area."""
+    return series_triplets_from_normalised(
+        _normalise_volume(raw),
+        gap=gap,
+        center_offset=center_offset,
+        crop_fraction=crop_fraction,
+    )
+
+
+def series_triplets_from_normalised(
+    normalized: np.ndarray,
+    *,
+    gap: int = 1,
+    center_offset: int = 0,
+    crop_fraction: float = CROP_FRACTION,
+) -> tuple[torch.Tensor, np.ndarray]:
+    """One view, from a volume that has already been normalised.
+
+    `prepare_series_triplets` is this plus the normalisation, and calls it, so
+    the two cannot drift. Splitting them lets a caller normalise a series once
+    and then build each test-time view from that -- which matters at inference,
+    where three views of a fourteen-series study held at once is roughly 3.2 GiB
+    of resized pixels, against about 0.6 for the normalised volumes they come
+    from.
+    """
     if int(gap) < 1:
         raise ValueError("B42 2.5D gap must be positive")
-    normalized = _normalise_volume(raw)
     centers, position = slice_centres(
         len(normalized), gap=int(gap), center_offset=int(center_offset)
     )

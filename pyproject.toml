@@ -23,6 +23,7 @@ test = ["pytest>=8.0", "scikit-learn>=1.3"]
 rsna-knee-train = "rsna_knee.training.loop:main"
 rsna-knee-coverage = "rsna_knee.data.coverage:main"
 rsna-knee-expert-audit = "rsna_knee.expert_audit:main"
+rsna-knee-submit = "rsna_knee.submission.launcher:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

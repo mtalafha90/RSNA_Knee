@@ -110,6 +110,8 @@ def test_the_layout_says_what_each_part_does():
         "model/study_model.py",
         "training/supervision.py", "training/losses.py", "training/memory.py",
         "training/surface.py", "training/loop.py",
+        "submission/test_surface.py", "submission/views.py",
+        "submission/runner.py", "submission/launcher.py",
     }
     found = {str(p.relative_to(SOURCE)) for p in source_files()}
     assert found == expected, f"unexpected: {found - expected}, missing: {expected - found}"

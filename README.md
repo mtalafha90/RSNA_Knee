@@ -11,7 +11,19 @@ pip install -e ".[test]"
 rsna-knee-coverage --data-root artefacts/data       # is the data here?
 rsna-knee-train --epochs 6 --all-data --preflight-only
 rsna-knee-train --epochs 6 --all-data
+
+# score it against the 58 expert studies, which no teacher change moves
+rsna-knee-expert-audit --checkpoint runs/augmented_training/best_model.pt --label run
+
+# and submit it, from here
+rsna-knee-submit --checkpoint runs/augmented_training/best_model.pt --limit 3
+rsna-knee-submit --checkpoint runs/augmented_training/best_model.pt
 ```
+
+`--limit 3` scores the first few studies on whatever card is present. The
+submission path runs on one GPU as well as two, so it can be smoke-tested
+locally rather than only on Kaggle -- which is where its predecessor's three
+hidden failures were each discovered.
 
 Every path defaults into `artefacts/`, so a set-up checkout needs no flags. Pass
 `--data-root`, `--labels-root`, `--series-policy`, `--base-checkpoint` or
@@ -132,9 +144,6 @@ a reader which frozen contract just refused them.
 
 ## Known gaps
 
-- **No submission path.** Every inference launcher in the archive pins a
-  specific checkpoint by SHA-256, and none of them names a checkpoint this
-  trainer produces. A run from here cannot be submitted until a launcher pins it.
 - **Untrained.** The experiment in `docs/EXPERIMENT.md` has not been run. The
   code is here and proven identical to its source; no result exists.
 - **Artefacts not included.** The data, labels, series policy, base checkpoint
