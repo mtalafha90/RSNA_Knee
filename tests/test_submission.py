@@ -226,3 +226,60 @@ def test_a_table_without_study_uids_says_so(tmp_path):
     pd.DataFrame({"something_else": ["a"]}).to_csv(path, index=False)
     with pytest.raises(ValueError, match="no StudyInstanceUID"):
         load_test_csv(path)
+
+
+# --- how many GPUs a real submission needs --------------------------------
+#
+# On two T4s the hidden set takes about four hours; on one, about nine against a
+# nine-hour ceiling, so it does not finish. The archive's launcher refuses below
+# two for that reason -- and as a result its submission path could only ever be
+# exercised on Kaggle, where each of its three failures cost a submission slot.
+# The refusal is kept and made waivable, so a smoke test is possible without
+# making an unfinishable run possible by accident.
+
+
+def _no_gpus(monkeypatch):
+    from rsna_knee.submission import launcher
+
+    monkeypatch.setattr(launcher.torch.cuda, "is_available", lambda: False)
+    return launcher
+
+
+def test_a_full_run_refuses_a_single_device(monkeypatch, tmp_path):
+    launcher = _no_gpus(monkeypatch)
+    with pytest.raises(RuntimeError, match="needs two GPUs"):
+        launcher.generate_submission(
+            {}, data_root=tmp_path, checkpoint=tmp_path / "c.pt",
+            base_checkpoint=tmp_path / "b.pt",
+        )
+
+
+def test_a_limited_run_waives_it_on_its_own(monkeypatch, tmp_path):
+    """A smoke test names its own size, which an accidental full run cannot."""
+    launcher = _no_gpus(monkeypatch)
+    with pytest.raises(Exception) as excinfo:
+        launcher.generate_submission(
+            {}, data_root=tmp_path, checkpoint=tmp_path / "c.pt",
+            base_checkpoint=tmp_path / "b.pt", limit=3,
+        )
+    assert "needs two GPUs" not in str(excinfo.value)
+
+
+def test_the_waiver_can_also_be_stated_outright(monkeypatch, tmp_path):
+    launcher = _no_gpus(monkeypatch)
+    with pytest.raises(Exception) as excinfo:
+        launcher.generate_submission(
+            {}, data_root=tmp_path, checkpoint=tmp_path / "c.pt",
+            base_checkpoint=tmp_path / "b.pt", allow_single_gpu=True,
+        )
+    assert "needs two GPUs" not in str(excinfo.value)
+
+
+def test_the_manifest_records_whether_it_was_a_full_run():
+    """So a score can never be read against a submission that scored 3 studies."""
+    import inspect
+
+    from rsna_knee.submission.launcher import generate_submission
+
+    source = inspect.getsource(generate_submission)
+    assert '"full_run": len(devices) >= 2 and limit is None' in source

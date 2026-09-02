@@ -98,6 +98,7 @@ def generate_submission(
     max_hours: float = 8.25,
     reserve_minutes: float = 30.0,
     limit: int | None = None,
+    allow_single_gpu: bool = False,
 ) -> Path:
     """Write submission.csv and a manifest recording exactly what produced it."""
     if on_unreadable not in ON_UNREADABLE_MODES:
@@ -115,10 +116,23 @@ def generate_submission(
         f"runtime guard=telemetry only; on_unreadable={on_unreadable}",
         flush=True,
     )
-    if len(devices) == 1 and devices[0].type == "cuda":
+    # A full hidden run on one T4 is roughly nine hours against a nine-hour
+    # ceiling, so it does not finish. Two T4s shard it to about four. The
+    # archive's launcher refuses below two for exactly that reason, and this one
+    # keeps the refusal -- but makes it waivable, because a submission path that
+    # can only be exercised on Kaggle is one whose defects are found there, at a
+    # submission slot each. --limit is a smoke test and waives it on its own.
+    if len(devices) < 2 and not (allow_single_gpu or limit is not None):
+        raise RuntimeError(
+            f"a full run needs two GPUs; {len(devices)} visible. On two T4s the "
+            "hidden set takes about four hours, on one about nine against a "
+            "nine-hour ceiling. Pass --limit N for a smoke test on this card, or "
+            "--allow-single-gpu if you mean it."
+        )
+    if len(devices) < 2:
         print(
-            "[submit] one GPU: this works and is roughly twice the wall clock of "
-            "two. Use it for a smoke test; use two for the real run.",
+            f"[submit] {len(devices)} device(s), which is a smoke test rather than "
+            "a submission: a full hidden run needs two.",
             flush=True,
         )
 
@@ -219,6 +233,7 @@ def generate_submission(
         "tta_center_offsets": list(TTA_OFFSETS),
         "tta_aggregation": "mean of per-view sigmoid probabilities",
         "devices": [str(d) for d in devices],
+        "full_run": len(devices) >= 2 and limit is None,
         "study_sharding": f"test-row index modulo {len(devices)}",
         "execution": {
             "tta_materialization": "one complete study view at a time",
@@ -280,6 +295,13 @@ def main() -> None:
         "--limit", type=int, default=None,
         help="score only the first N studies, for a smoke test on a local card",
     )
+    parser.add_argument(
+        "--allow-single-gpu", action="store_true",
+        help=(
+            "run the whole test set on one GPU. A hidden run then takes about "
+            "nine hours against a nine-hour ceiling, so this is for local use"
+        ),
+    )
     args = parser.parse_args()
 
     from ..training.loop import read_config  # noqa: PLC0415
@@ -293,6 +315,7 @@ def main() -> None:
         expected_checkpoint_sha256=args.expected_checkpoint_sha256,
         on_unreadable=args.on_unreadable,
         limit=args.limit,
+        allow_single_gpu=args.allow_single_gpu,
     )
 
 
