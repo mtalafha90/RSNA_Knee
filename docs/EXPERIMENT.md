@@ -134,6 +134,62 @@ nothing else. Not with a leaderboard score.
 
 `--no-augment` reproduces the middle rows exactly, which is the control arm.
 
+## The second reading, which the last hidden result made necessary
+
+The 548-study validation surface this run selects its epoch on is
+**report-derived**, like the training labels. The hidden competition test is
+scored against **expert** labels. Those are not the same target, and the gap
+has now been measured three times:
+
+```text
+B15    +0.167 teacher agreement    -0.008 expert AUC
+B25X   +0.058 weak surface         +0.002 on eleven targets
+B50    +0.011 report-derived       -0.002 expert-58   ->  -0.001 hidden
+```
+
+That last row is the reason this section exists. B50's report-derived
+comparison was well run and passed a rule frozen in advance. Its expert-58
+audit disagreed and was recorded as inconclusive, correctly, because 58
+studies resolve to about `+/-0.03`. Carried to full scale as B51, the hidden
+test returned `-0.001` -- closer to the audit than to the 548-study surface.
+
+So this run is read twice:
+
+```bash
+rsna-knee-expert-audit --checkpoint runs/augmented_training/best_model.pt \
+                       --label b53
+
+rsna-knee-expert-audit --checkpoint <the no-augment control> --label control
+
+rsna-knee-expert-audit --checkpoint runs/augmented_training/best_model.pt \
+                       --label b53 \
+                       --against artefacts/expert58/control_expert58_predictions.csv
+```
+
+The audit reports the delta **and its ceiling** -- the fraction of
+positive-negative study pairs the two checkpoints order differently, which is
+exactly the largest AUC difference they could possibly show. B48 and B49 were
+both judged against a `+0.010` threshold with ceilings of `0.0015` and
+`0.0024`: neither could have passed whatever its mechanism did. A delta
+without its ceiling hides that.
+
+**Read the audit as a veto, never as a confirmation.** Fifty-eight studies
+cannot support a small gain; they can only catch a report-surface gain that
+fails to reach expert truth, which is what has happened three times. The rule
+is fixed in `expert_audit.py` before any B53 number exists:
+
+```text
+delta <= -0.020    VETO. Do not submit; this is B15's failure again.
+-0.020 to +0.010   INCONCLUSIVE, the likely and acceptable outcome. The
+                   result then rests on the report-derived comparison alone,
+                   and the record must say so.
+delta >= +0.010    supported on expert truth as well.
+```
+
+The 58 studies are held out of every run and stay that way. This audit selects
+nothing -- not an epoch, not a seed, not a setting. Selecting on them would
+spend the only expert-truth proxy the project has.
+
 ## Reading the result, decided in advance
 
 * **Clearly above the baseline.** Augmentation was worth having, and the next
