@@ -10,7 +10,7 @@ import time
 import torch
 import yaml
 
-from ..checkpoints import load_base_checkpoint, require_base_checkpoint, sha256_file
+from ..checkpoints import EXPECTED_BASE_CELLS, load_base_checkpoint, require_base_checkpoint, sha256_file
 from ..constants import CONSTRUCTION_SEED_OFFSET, DEFAULT_SEED, LOADER_SEED_OFFSET, TARGETS
 from ..data.augmentation import AugmentationPolicy, AugmentedStudyDataset, DEFAULT_SLICE_JITTER, verify_augmentation_reaches_pixels
 from ..data.coverage import require_dicom_coverage
@@ -316,6 +316,7 @@ def train(
     seed: int = DEFAULT_SEED,
     out_root: str | Path = DEFAULT_RUN_ROOT,
     preflight_only: bool = False,
+    expected_cells: int | None = None,
 ) -> Path | None:
     """B52's run with the augmentation actually applied, and nothing else moved."""
     settings = dict(config)
@@ -378,6 +379,9 @@ def train(
         data_root=root,
         labels_root=labels_root,
         config=settings,
+        expected_cells=(
+            EXPECTED_BASE_CELLS if expected_cells is None else int(expected_cells)
+        ),
         domain_rows=domain_rows,
         base_payload=base_payload,
     )
@@ -709,6 +713,17 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--out-root", default=DEFAULT_RUN_ROOT)
     parser.add_argument("--preflight-only", action="store_true")
+    parser.add_argument(
+        "--expected-cells",
+        type=int,
+        default=None,
+        help=(
+            "how many cells the label export is expected to supervise. Defaults "
+            "to the base checkpoint's own count, so an export edited between runs "
+            "still trips the guard. A deliberate change of teacher must name its "
+            "number here rather than have the guard relaxed for every run"
+        ),
+    )
     args = parser.parse_args()
     require_artefacts(args)
 
@@ -730,5 +745,6 @@ def main() -> None:
         seed=args.seed,
         out_root=args.out_root,
         preflight_only=args.preflight_only,
+        expected_cells=args.expected_cells,
     )
 

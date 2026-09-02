@@ -19,8 +19,20 @@ def build_report_only_surface(
     config: dict,
     domain_rows: pd.DataFrame,
     base_payload: dict,
+    expected_cells: int = EXPECTED_BASE_CELLS,
 ) -> tuple:
-    """Return the split-aligned B48 weak-label surface without any gold rows."""
+    """Return the split-aligned B48 weak-label surface without any gold rows.
+
+    `expected_cells` pins how many cells the report labels supervise. Its default
+    is the base checkpoint's own count, so an export edited between runs still
+    trips the guard, which is what it is for.
+
+    A **deliberate** change of teacher changes that count legitimately -- filling
+    only negated cells, for instance, supervises 25,524 rather than 34,010 -- and
+    such a run must state the number it expects rather than have the guard
+    quietly relaxed for everyone. The count reaches the checkpoint either way, so
+    which surface trained a model is recoverable from the model.
+    """
     train = load_train_csv(data_root / config.get("train_csv", "train.csv"))
     if len(train) != 4407:
         raise ValueError("B48 requires the complete 4,407-study training release")
@@ -31,8 +43,15 @@ def build_report_only_surface(
     all_uids = [str(uid) for uid in all_uids]
     if len(all_uids) != REPORT_ONLY_STUDIES:
         raise ValueError("B48 requires all 4,349 report-only studies before the split")
-    if int((all_weights > 0).sum()) != EXPECTED_BASE_CELLS:
-        raise ValueError("B48 weak supervision surface changed")
+    observed_cells = int((all_weights > 0).sum())
+    if observed_cells != int(expected_cells):
+        raise ValueError(
+            f"the weak supervision surface has {observed_cells:,} cells, not the "
+            f"{int(expected_cells):,} this run expects. If the label export was "
+            "edited or replaced by accident, that is what this guard is for. If "
+            "the teacher was changed on purpose, say so: pass "
+            f"--expected-cells {observed_cells}"
+        )
     if set(all_uids).intersection(gold_uids):
         raise RuntimeError("B48 report-only supervision includes an official gold study")
     if int(fill_audit.get("base_cells_overridden", -1)) != 0:
@@ -56,6 +75,7 @@ def build_report_only_surface(
             float(confidence[key]), float(base_confidence[key]), atol=1e-12, rtol=0
         ):
             raise ValueError(f"B48 label confidence mismatch for {key}")
+    supervision = {**supervision, "expected_cells": int(expected_cells)}
     lookup = {uid: index for index, uid in enumerate(all_uids)}
     return (
         train,
