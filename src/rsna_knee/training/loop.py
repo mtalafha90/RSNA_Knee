@@ -12,7 +12,7 @@ import yaml
 
 from ..checkpoints import EXPECTED_BASE_CELLS, load_base_checkpoint, require_base_checkpoint, sha256_file
 from ..constants import CONSTRUCTION_SEED_OFFSET, DEFAULT_SEED, LOADER_SEED_OFFSET, TARGETS
-from ..data.augmentation import AugmentationPolicy, AugmentedStudyDataset, DEFAULT_SLICE_JITTER, verify_augmentation_reaches_pixels
+from ..data.augmentation import AugmentationPolicy, AugmentedStudyDataset, DEFAULT_SLICE_JITTER, verify_augmentation_is_off, verify_augmentation_reaches_pixels
 from ..data.coverage import require_dicom_coverage
 from ..data.dataset import StudyDataset, collate_studies
 from ..data.series_policy import FROZEN_SERIES_SIGNATURE, audit_series_surface, load_series_policy
@@ -134,14 +134,28 @@ def _build_valid_dataset(uids, index, dataset_config, crop_policy, targets, weig
 def preflight(
     model, runtime, train_dataset, multiplier_t, aux_weight: float, scaler
 ) -> dict:
-    """One forward and backward pass, plus the augmentation check."""
-    augmentation = verify_augmentation_reaches_pixels(train_dataset)
-    print(
-        f"[preflight] augmentation reaches the pixels: "
-        f"{augmentation['series_that_changed']}/{augmentation['series_compared']} series "
-        f"changed, max |diff| {augmentation['max_absolute_difference']:.6f}",
-        flush=True,
-    )
+    """One forward and backward pass, plus the augmentation check for this arm.
+
+    Both arms are checked, in opposite directions. With augmentation on, two
+    draws of a study must differ, or the run is B52 under another name. With it
+    off, they must be identical, or the control is not a control.
+    """
+    if train_dataset.policy.is_disabled():
+        augmentation = verify_augmentation_is_off(train_dataset)
+        print(
+            f"[preflight] augmentation is off and the pixels confirm it: "
+            f"{augmentation['series_compared']}/{augmentation['series_compared']} "
+            "series identical across two draws",
+            flush=True,
+        )
+    else:
+        augmentation = verify_augmentation_reaches_pixels(train_dataset)
+        print(
+            f"[preflight] augmentation reaches the pixels: "
+            f"{augmentation['series_that_changed']}/{augmentation['series_compared']} series "
+            f"changed, max |diff| {augmentation['max_absolute_difference']:.6f}",
+            flush=True,
+        )
 
     items = [train_dataset[index] for index in range(min(2, len(train_dataset)))]
     for item, scale in zip(items, batch_scales(items, multiplier_t.detach().cpu())):
@@ -178,6 +192,7 @@ __all__ = [
     "DEFAULT_EPOCHS",
     "AugmentationPolicy",
     "AugmentedStudyDataset",
+    "verify_augmentation_is_off",
     "verify_augmentation_reaches_pixels",
     "preflight",
     "train",

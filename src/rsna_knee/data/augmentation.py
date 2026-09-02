@@ -320,3 +320,57 @@ def verify_augmentation_reaches_pixels(dataset: AugmentedStudyDataset) -> dict:
     dataset.set_epoch(0)
     return report
 
+
+def verify_augmentation_is_off(dataset) -> dict:
+    """Draw the same study twice and confirm the pixels are identical.
+
+    The mirror of `verify_augmentation_reaches_pixels`, and the control arm's
+    equivalent. `--no-augment` exists to reproduce the run this experiment is
+    measured against, and a control that augmented a little would compare
+    nothing to nothing. Skipping the check for the control would leave the arm
+    that most needs a guarantee as the only one without one.
+    """
+    if not len(dataset):
+        raise RuntimeError("cannot verify augmentation on an empty dataset")
+    if not dataset.policy.is_disabled():
+        raise RuntimeError(
+            "verify_augmentation_is_off was called with augmentation on; "
+            "use verify_augmentation_reaches_pixels"
+        )
+
+    dataset.set_epoch(1)
+    first = dataset[0]
+    dataset.set_epoch(2)
+    second = dataset[0]
+
+    live = [
+        position
+        for position in range(len(first["present"]))
+        if float(first["present"][position]) > 0
+    ]
+    if not live:
+        raise RuntimeError("the first study has no readable series to compare")
+
+    differences = [
+        float((first["volumes"][position] - second["volumes"][position]).abs().max())
+        for position in live
+    ]
+    report = {
+        "series_compared": len(live),
+        "series_that_changed": int(sum(1 for value in differences if value > 0)),
+        "max_absolute_difference": max(differences),
+        "policy": dataset.policy.active(),
+        "augmentation_enabled": False,
+    }
+    if report["series_that_changed"]:
+        raise RuntimeError(
+            "augmentation is switched off, but two draws of the same study "
+            f"differ by {report['max_absolute_difference']:.6f} across "
+            f"{report['series_that_changed']} series. Something is still "
+            "distorting the pixels, so this is not the control arm it claims "
+            "to be."
+        )
+
+    dataset.set_epoch(0)
+    return report
+

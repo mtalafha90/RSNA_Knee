@@ -319,3 +319,87 @@ def test_the_plain_dataset_still_ignores_config_augmentation_fields(study_on_dis
     torch.manual_seed(2)
     plain = off[0]["volumes"][0]
     assert torch.equal(first, second) and torch.equal(first, plain)
+
+
+# --- the control arm, which had never been run ----------------------------
+#
+# `--no-augment` is documented as reproducing the run this experiment is
+# measured against. It crashed on every attempt: preflight called
+# verify_augmentation_reaches_pixels unconditionally, and that function
+# correctly refuses to verify augmentation that is switched off. The control arm
+# of the experiment was unreachable.
+
+
+def _plain_dataset(study_on_disk, dataset_config, policy):
+    from rsna_knee.data.augmentation import AugmentedStudyDataset
+
+    _root, records = study_on_disk
+    return AugmentedStudyDataset(
+        ["study-a"], records, dataset_config, crop_focus_policy=CROP_POLICY,
+        center_offsets=(0,),
+        targets=np.zeros((1, TARGET_COUNT), np.float32),
+        weights=np.ones((1, TARGET_COUNT), np.float32),
+        policy=policy, seed=2026,
+    )
+
+
+def test_the_control_arm_verifies_that_nothing_moved(study_on_disk, dataset_config):
+    """The mirror check. Skipping it would leave the arm that most needs a
+    guarantee as the only one without one."""
+    from rsna_knee.data.augmentation import verify_augmentation_is_off
+
+    dataset = _plain_dataset(study_on_disk, dataset_config, AugmentationPolicy.disabled())
+    report = verify_augmentation_is_off(dataset)
+
+    assert report["series_that_changed"] == 0
+    assert report["max_absolute_difference"] == 0.0
+    assert report["augmentation_enabled"] is False
+    assert report["series_compared"] == 2
+
+
+def test_the_control_check_refuses_an_augmenting_dataset(study_on_disk, dataset_config):
+    """Each check answers one arm's question. Neither answers the other's."""
+    from rsna_knee.data.augmentation import verify_augmentation_is_off
+
+    dataset = _plain_dataset(
+        study_on_disk, dataset_config, AugmentationPolicy.from_config({})
+    )
+    with pytest.raises(RuntimeError, match="was called with augmentation on"):
+        verify_augmentation_is_off(dataset)
+
+
+def test_a_control_arm_that_secretly_augments_is_refused(study_on_disk, dataset_config):
+    """The failure this exists to catch: a control that is not one.
+
+    The policy says disabled while the pixels still move between draws -- which
+    is the same shape of defect as B52's, pointing the other way.
+    """
+    from rsna_knee.data.augmentation import verify_augmentation_is_off
+
+    dataset = _plain_dataset(study_on_disk, dataset_config, AugmentationPolicy.disabled())
+    inner = type(dataset).__getitem__
+    draws = {"n": 0}
+
+    class Wobbling(type(dataset)):
+        def __getitem__(self, index):
+            item = inner(self, index)
+            draws["n"] += 1
+            if draws["n"] % 2 == 0:
+                item["volumes"] = [volume + 0.5 for volume in item["volumes"]]
+            return item
+
+    dataset.__class__ = Wobbling
+    with pytest.raises(RuntimeError, match="not the control arm it claims"):
+        verify_augmentation_is_off(dataset)
+
+
+def test_preflight_checks_whichever_arm_is_running():
+    """Dispatching on the policy is what makes --no-augment reachable at all."""
+    import inspect
+
+    from rsna_knee.training.loop import preflight
+
+    source = inspect.getsource(preflight)
+    assert "train_dataset.policy.is_disabled()" in source
+    assert "verify_augmentation_is_off" in source
+    assert "verify_augmentation_reaches_pixels" in source
