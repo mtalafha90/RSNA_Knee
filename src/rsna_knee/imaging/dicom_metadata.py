@@ -1,6 +1,8 @@
 """Recovering plane, fluid sensitivity and fat suppression from the DICOM itself."""
 from __future__ import annotations
 
+from .codecs import pydicom as _pydicom
+
 from pathlib import Path
 from typing import Any, Sequence
 import numpy as np
@@ -96,7 +98,7 @@ def read_series_metadata(series_dir: str | Path) -> dict[str, Any]:
     ``Fat_Suppression`` and ``weighting``. Values are ``None`` when they cannot
     be determined, so a caller can leave the CSV value in place.
     """
-    import pydicom
+    pydicom = _pydicom()
 
     unknown: dict[str, Any] = {
         "Anatomical_Plane": None,

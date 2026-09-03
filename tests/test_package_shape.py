@@ -102,6 +102,7 @@ def test_the_layout_says_what_each_part_does():
     expected = {
         "constants.py", "runtime.py", "evaluation.py", "checkpoints.py",
         "expert_audit.py",
+        "imaging/codecs.py",
         "imaging/dicom_io.py", "imaging/dicom_metadata.py", "imaging/physical_scale.py",
         "imaging/crop_policy.py", "imaging/triplets.py",
         "data/tables.py", "data/series_policy.py", "data/coverage.py", "data/labels.py",

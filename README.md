@@ -72,6 +72,7 @@ src/rsna_knee/
   checkpoints.py        reading and fingerprinting the base checkpoint
 
   imaging/              pixels: DICOM in, model input out
+    codecs.py             importing pydicom after its plugins were installed
     dicom_io.py           locating a series, sorting frames, normalising
     dicom_metadata.py     recovering plane / fluid / fat from the DICOM
     physical_scale.py     resampling so a millimetre means one thing

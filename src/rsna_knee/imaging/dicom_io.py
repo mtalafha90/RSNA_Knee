@@ -1,6 +1,8 @@
 """Reading pixels off disk: locating a series, sorting its frames, normalising intensity."""
 from __future__ import annotations
 
+from .codecs import pydicom as _pydicom
+
 from pathlib import Path
 import numpy as np
 import torch
@@ -132,7 +134,7 @@ def _iter_dicom_files(path: Path) -> list[Path]:
 
 
 def read_dicom_series(path: str | Path, *, return_stats: bool = False):
-    import pydicom
+    pydicom = _pydicom()
 
     path = Path(path)
     candidates = _iter_dicom_files(path)
