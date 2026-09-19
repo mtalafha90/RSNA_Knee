@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Large imaging data: never commit the full DICOM corpus.
+# A small, deliberately chosen sample under data/sample_dicom/ may be
+# force-added with `git add -f` when it is genuinely needed.
+data/sample_dicom/**
+!data/sample_dicom/.gitkeep
+*.dcm
+*.npy
+*.npz
+*.pt
+*.pth
+*.ckpt
+*.h5
+
+# Generated outputs
+reports/*.png
+reports/*.html
