@@ -1,59 +1,65 @@
-# What to put in this repository, and what to keep out
+# What is here, what is still needed
 
 This session has 4 CPU cores, 15 GB of RAM, about 30 GB of free disk and **no
-GPU**. It cannot hold the imaging data and cannot train anything. Training
-happens on your own GPU machine. So the job here is analysis, pipeline design
-and code — which needs metadata, not pixels.
+GPU**. It cannot hold the imaging data and cannot train anything. Training runs
+on a separate GPU machine. The work here is analysis, label extraction and
+pipeline design — which needs metadata and text, not pixels.
 
-## Commit these (small, and they unblock everything)
+## Already committed
 
-Place them in `data/raw/`:
+In `data/`:
 
-| File | Why it is needed |
-|---|---|
-| `train.csv` | The labels. Gives prevalence, co-occurrence and the exact column names. |
-| `train_series.csv` | Series-level metadata. Decides how studies are assembled into model inputs. |
-| `sample_submission.csv` | Fixes the exact output format, column names and order. |
-| the reports file | Whether it is a column in `train.csv` or its own file, the text drives the auxiliary-supervision design. |
-| any other provided CSV | Nothing should be left out; small files cost nothing. |
+| File | Rows | Notes |
+|---|---:|---|
+| `train.csv` | 4,407 | Reports in their original languages, plus labels for 58 studies. |
+| `hand_labels.csv` | 4,407 | English translations of every report, plus labels for 82 studies. Delimited with ", ", and one row is corrupt. |
+| `train_series.csv` | 24,371 | Series metadata. `Fat_Suppression` duplicates `Fluid_Sensitive` exactly. |
+| `test.csv` | 3 | Placeholder. `StudyInstanceUID` only — no reports at test time. |
+| `test_series.csv` | 15 | Same columns as `train_series.csv`. |
+| `sample_submission.csv` | 3 | Thirteen columns, every probability 0.5. |
 
-These should total a handful of megabytes. If the reports file is large,
-commit it anyway — text compresses well in git.
+Read them through `scripts/load_data.py`, which handles the whitespace and the
+corrupt row. See `findings-01-metadata.md` for what the numbers mean.
 
-## Also paste across (because the pages are unreachable from here)
+## Still needed
 
-The competition website is blocked by this session's network policy. Copy the
-visible text of these four pages into `docs/kaggle-pages/` as plain Markdown:
+**1. The Kaggle page text.** The competition website is blocked by this
+session's network policy, so five questions remain open: the notebook runtime
+limit, the external data and pre-trained weight policies, the winning-solution
+licence, the efficiency-track scoring formula, and the submission and team
+limits. Copy the visible text of the Overview, Data and Rules pages into
+`docs/kaggle-pages/` as plain Markdown.
 
-- Overview (including the Evaluation and Timeline tabs)
-- Data
-- Rules
-- The efficiency-track description, if it is on a separate page
-
-Without these, the brief in `competition-brief.md` stays unverified guesswork.
-
-## Run this on the GPU machine, then commit its output
+**2. The DICOM header summary.** Run this where the images live and commit the
+result:
 
 ```bash
 python scripts/dump_dicom_headers.py \
     --dicom-root /path/to/train_series \
-    --out data/raw/dicom_headers_sample.csv \
+    --out data/dicom_headers_sample.csv \
     --studies 300
 ```
 
-It reads headers only, never pixel data, so it is quick. The result is a single
-CSV of a few megabytes describing the scanner mix, pulse sequences, slice
-geometry and image sizes across 300 studies. That is what the preprocessing
-pipeline needs to be designed against. Direct patient identifiers are not
-collected.
+It reads headers only, never pixel data, so it is quick. The result is a few
+megabytes describing the scanner mix, pulse sequences, slice geometry and image
+sizes. That is what the preprocessing pipeline must be designed against. No
+direct patient identifiers are collected.
+
+**3. The GPU specification.** Model and VRAM, and roughly how many hours a day
+it can run. With four weeks left, that decides whether the plan is 2.5D slice
+models at 384px with five-fold cross-validation, or something leaner.
+
+**4. The provenance of `hand_labels.csv`.** If it came with the competition, it
+can be used freely. If the English translations were produced by sending report
+text to an external service, that needs checking against the competition's
+data-security rules before anything is built on it.
 
 ## Optionally, a handful of actual slices
 
-If pixel-level questions come up — intensity ranges, how the images are
-windowed, whether any series are colour or multi-frame — then 20 to 30
-individual `.dcm` files from a few different sites are enough. Put them in
-`data/sample_dicom/` and force-add them, since `.gitignore` excludes that
-directory by default:
+For pixel-level questions — intensity ranges, windowing, whether any series are
+colour or multi-frame — 20 to 30 individual `.dcm` files from a few different
+sites are enough. Put them in `data/sample_dicom/` and force-add them, since
+`.gitignore` excludes that directory:
 
 ```bash
 git add -f data/sample_dicom/
@@ -63,16 +69,4 @@ git add -f data/sample_dicom/
 
 - The full DICOM corpus. It will not fit, and there is no GPU here to use it.
 - Model checkpoints, cached tensors or preprocessed image arrays.
-- Your Kaggle API token or any other credential.
-
-## Once the files are in place
-
-```bash
-pip install -r requirements.txt
-python scripts/inspect_data.py
-```
-
-This writes `reports/schema_report.md`, describing every column of every file
-it finds: role, cardinality, missing values, label prevalence, findings per
-study, and how series nest within studies. It assumes nothing about file or
-column names, so it works whatever the real schema turns out to be.
+- Kaggle API tokens or any other credential.

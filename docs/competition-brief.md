@@ -95,16 +95,31 @@ Two consequences follow from the metric:
 
 ## Verification checklist
 
-Each of these needs confirming against the official pages before it drives a
-decision:
+The metadata files are now committed, so some of this is settled. See
+`findings-01-metadata.md` for the measurements behind the confirmed entries.
 
-- [ ] Exact label column names and their order.
-- [ ] Exact CSV file names and their columns.
-- [ ] Where the report text lives (a column in `train.csv` or a separate file).
-- [ ] Whether labels contain missing values as well as 0 and 1.
-- [ ] Exact submission column names and the study identifier column name.
+- [x] Exact label column names and order — `ACL`, `MCL`, `Medial Meniscus`,
+      `Lateral Meniscus`, `Medial OA`, `Lateral OA`, `PF OA`, `Effusion`,
+      `Synovitis`, `Baker's`, `Contusion`, `Fracture`.
+- [x] Exact CSV file names and columns.
+- [x] Where the report text lives — a `Report` column in `train.csv`, with an
+      English translation in `hand_labels.csv`.
+- [x] Whether labels contain missing values — overwhelmingly yes. Only 82 of
+      4,407 studies carry any label at all.
+- [x] Exact submission columns — `StudyInstanceUID` plus the twelve labels.
 - [ ] Notebook runtime limit, and whether it differs for CPU and GPU.
 - [ ] External data policy and pre-trained weight policy.
 - [ ] Winning-solution licence obligations.
 - [ ] Efficiency-track scoring formula.
 - [ ] Daily submission limit and maximum team size.
+
+The five that remain all live on the Rules and Overview pages, which are
+unreachable from this environment. They need pasting into `docs/kaggle-pages/`.
+
+## Correction to the earlier reading
+
+This brief originally described the task as supervised multi-label
+classification over 5,000-odd labelled exams. That was wrong, and the error
+came from press coverage rather than the data. The labels are 98% absent; the
+training signal is the report text. `findings-01-metadata.md` sets out what is
+actually there.

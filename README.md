@@ -10,9 +10,11 @@ MRI studies, scored by macro-averaged AUC-ROC.
 |---|---|
 | `docs/competition-brief.md` | Working understanding of the task, data, metric and rules, with a checklist of what still needs verifying. |
 | `docs/data-handover.md` | Exactly which files to put in this repository, and which to keep out. |
+| `docs/findings-01-metadata.md` | What the metadata actually contains. Read this first. |
+| `scripts/load_data.py` | Loaders that handle the known data traps. Start here in any new script or notebook. |
 | `scripts/inspect_data.py` | Schema-agnostic inspection of whatever CSVs are present. Writes `reports/schema_report.md`. |
 | `scripts/dump_dicom_headers.py` | Summarises DICOM headers into one small, shareable CSV. Run it where the images live. |
-| `data/raw/` | Competition metadata CSVs. Small files only. |
+| `data/` | Competition metadata CSVs. Small files only; no imaging data. |
 | `data/sample_dicom/` | A handful of sample slices, if needed. Excluded from git by default. |
 | `reports/` | Generated analysis output. |
 
@@ -23,7 +25,15 @@ pip install -r requirements.txt
 python scripts/inspect_data.py
 ```
 
-See `docs/data-handover.md` for what needs to be in `data/raw/` first.
+The metadata is already committed. See `docs/data-handover.md` for what is
+still outstanding.
+
+## The shape of the problem
+
+Only 82 of the 4,407 training studies carry labels. For the other 98%, the
+training signal is the free-text radiology report. Deriving the twelve labels
+from those reports is the first task, and its quality caps everything the
+imaging model can achieve afterwards.
 
 ## How the work is split
 

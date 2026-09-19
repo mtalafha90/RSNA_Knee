@@ -6,7 +6,7 @@ written, so that later scripts can be written against facts rather than
 guesses.
 
 Usage:
-    python scripts/inspect_data.py [--raw-dir data/raw] [--out reports/schema_report.md]
+    python scripts/inspect_data.py [--raw-dir data] [--out reports/schema_report.md]
 """
 
 from __future__ import annotations
@@ -164,7 +164,7 @@ def describe_file(path: Path) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--raw-dir", default="data/raw", type=Path)
+    parser.add_argument("--raw-dir", default="data", type=Path)
     parser.add_argument("--out", default="reports/schema_report.md", type=Path)
     args = parser.parse_args()
 
