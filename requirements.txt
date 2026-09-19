@@ -1,0 +1,7 @@
+# Metadata analysis and DICOM handling.
+# Deep learning dependencies are deliberately left out: training happens on a
+# separate GPU machine, and this repository's analysis scripts must stay light.
+pandas>=2.2
+numpy>=1.26
+pydicom>=3.0
+matplotlib>=3.8
