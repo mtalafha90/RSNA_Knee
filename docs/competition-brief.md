@@ -102,9 +102,11 @@ The metadata files are now committed, so some of this is settled. See
       `Lateral Meniscus`, `Medial OA`, `Lateral OA`, `PF OA`, `Effusion`,
       `Synovitis`, `Baker's`, `Contusion`, `Fracture`.
 - [x] Exact CSV file names and columns.
-- [x] Where the report text lives — a `Report` column in `train.csv`, with an
-      English translation in `hand_labels.csv`.
-- [x] Whether labels contain missing values — overwhelmingly yes. Only 82 of
+- [x] Where the report text lives — a `Report` column in `train.csv`, in the
+      report's original language. Fourteen languages, English only 39%.
+      (`hand_labels.csv` carries translations but is excluded from the project:
+      unknown provenance.)
+- [x] Whether labels contain missing values — overwhelmingly yes. Only 58 of
       4,407 studies carry any label at all.
 - [x] Exact submission columns — `StudyInstanceUID` plus the twelve labels.
 - [ ] Notebook runtime limit, and whether it differs for CPU and GPU.
@@ -120,6 +122,6 @@ unreachable from this environment. They need pasting into `docs/kaggle-pages/`.
 
 This brief originally described the task as supervised multi-label
 classification over 5,000-odd labelled exams. That was wrong, and the error
-came from press coverage rather than the data. The labels are 98% absent; the
-training signal is the report text. `findings-01-metadata.md` sets out what is
-actually there.
+came from press coverage rather than the data. The labels are 98.7% absent; the
+training signal is the report text, in fourteen languages.
+`findings-01-metadata.md` sets out what is actually there.

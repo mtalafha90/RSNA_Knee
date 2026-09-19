@@ -11,7 +11,8 @@ MRI studies, scored by macro-averaged AUC-ROC.
 | `docs/competition-brief.md` | Working understanding of the task, data, metric and rules, with a checklist of what still needs verifying. |
 | `docs/data-handover.md` | Exactly which files to put in this repository, and which to keep out. |
 | `docs/findings-01-metadata.md` | What the metadata actually contains. Read this first. |
-| `scripts/load_data.py` | Loaders that handle the known data traps. Start here in any new script or notebook. |
+| `scripts/load_data.py` | Loaders for the metadata. Start here in any new script or notebook. |
+| `scripts/analyse_reports.py` | Language mix of the reports and characterisation of the gold set. |
 | `scripts/inspect_data.py` | Schema-agnostic inspection of whatever CSVs are present. Writes `reports/schema_report.md`. |
 | `scripts/dump_dicom_headers.py` | Summarises DICOM headers into one small, shareable CSV. Run it where the images live. |
 | `data/` | Competition metadata CSVs. Small files only; no imaging data. |
@@ -30,10 +31,14 @@ still outstanding.
 
 ## The shape of the problem
 
-Only 82 of the 4,407 training studies carry labels. For the other 98%, the
+Only 58 of the 4,407 training studies carry labels. For the other 98%, the
 training signal is the free-text radiology report. Deriving the twelve labels
 from those reports is the first task, and its quality caps everything the
-imaging model can achieve afterwards.
+imaging model can achieve afterwards. The reports span fourteen languages, of
+which English is only 39%.
+
+`data/hand_labels.csv` is excluded from the project: unknown provenance, and
+translated rather than source text. No code reads it.
 
 ## How the work is split
 

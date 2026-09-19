@@ -11,15 +11,15 @@ In `data/`:
 
 | File | Rows | Notes |
 |---|---:|---|
-| `train.csv` | 4,407 | Reports in their original languages, plus labels for 58 studies. |
-| `hand_labels.csv` | 4,407 | English translations of every report, plus labels for 82 studies. Delimited with ", ", and one row is corrupt. |
+| `train.csv` | 4,407 | Reports in their original languages, plus labels for 58 studies. The only ground truth. |
+| `hand_labels.csv` | 4,407 | **Excluded.** Unknown provenance, translated rather than source text. No code reads it. |
 | `train_series.csv` | 24,371 | Series metadata. `Fat_Suppression` duplicates `Fluid_Sensitive` exactly. |
 | `test.csv` | 3 | Placeholder. `StudyInstanceUID` only — no reports at test time. |
 | `test_series.csv` | 15 | Same columns as `train_series.csv`. |
 | `sample_submission.csv` | 3 | Thirteen columns, every probability 0.5. |
 
-Read them through `scripts/load_data.py`, which handles the whitespace and the
-corrupt row. See `findings-01-metadata.md` for what the numbers mean.
+Read them through `scripts/load_data.py`. See `findings-01-metadata.md` for
+what the numbers mean.
 
 ## Still needed
 
@@ -49,10 +49,15 @@ direct patient identifiers are collected.
 it can run. With four weeks left, that decides whether the plan is 2.5D slice
 models at 384px with five-fold cross-validation, or something leaner.
 
-**4. The provenance of `hand_labels.csv`.** If it came with the competition, it
-can be used freely. If the English translations were produced by sending report
-text to an external service, that needs checking against the competition's
-data-security rules before anything is built on it.
+**4. A decision on rebuilding the 24 lost gold studies.** Excluding
+`hand_labels.csv` takes the gold set from 82 studies to 58. Those 24 reports
+could be read and labelled directly, which would be a worthwhile afternoon
+given how thin 58 is.
+
+**5. A normal-study sample.** None of the 58 gold studies is normal, so the
+extractor's false-positive rate cannot be measured at all. A few dozen
+hand-checked normal reports would close the largest measurement gap in the
+project.
 
 ## Optionally, a handful of actual slices
 
