@@ -48,16 +48,25 @@ def load_train(data_dir: Path = DATA_DIR) -> pd.DataFrame:
 
 
 def load_gold(data_dir: Path = DATA_DIR) -> pd.DataFrame:
-    """The 58 labelled studies: the only ground truth available.
+    """The ground truth: every study for which we have trustworthy labels.
 
-    All 58 carry all twelve labels, and every one has at least one positive
-    finding. There is not a single all-negative study, so this set can measure
-    how well an extractor finds abnormalities but says nothing about how often
-    it invents them on a normal report.
+    Prefers `gold_labels.csv` — the enlarged set produced by hand-labelling a
+    worklist — and falls back to the 58 studies labelled in `train.csv` when it
+    does not exist yet.
+
+    Those original 58 all carry twelve labels and every one has at least one
+    positive finding. With no all-negative study among them, that set can
+    measure how well an extractor finds abnormalities but says nothing about
+    how often it invents them on a normal report. Enlarging it is what
+    `make_worklist.py` and `merge_gold.py` are for.
     """
+    enlarged = data_dir / "gold_labels.csv"
+    if enlarged.exists():
+        return pd.read_csv(enlarged)[["StudyInstanceUID", *LABELS]]
+
     train = load_train(data_dir)
     gold = train[train[LABELS].notna().all(axis=1)]
-    return gold.reset_index(drop=True)
+    return gold[["StudyInstanceUID", *LABELS]].reset_index(drop=True)
 
 
 def load_unlabelled(data_dir: Path = DATA_DIR) -> pd.DataFrame:
