@@ -15,6 +15,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -22,9 +23,28 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.load_data import LABELS, load_gold, load_train  # noqa: E402
+from scripts.metrics import bootstrap_macro_auc  # noqa: E402
 
 
 def read_candidate(path: Path, sheet: str | None) -> pd.DataFrame:
+    """Read a candidate label set from a spreadsheet, a CSV, or a verdicts file.
+
+    A .jsonl file is taken to be the output of extract_labels.py and its
+    verdicts are mapped to probabilities on the way in.
+    """
+    if path.suffix == ".jsonl":
+        from scripts.extract_labels import verdicts_to_probabilities
+
+        rows = []
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            rows.append(
+                {"StudyInstanceUID": record["StudyInstanceUID"],
+                 **verdicts_to_probabilities(record["verdicts"])}
+            )
+        return pd.DataFrame(rows)
     if path.suffix in {".xlsx", ".xlsm"}:
         return pd.read_excel(path, sheet_name=sheet or 0)
     return pd.read_csv(path)
@@ -99,24 +119,43 @@ def main() -> int:
         print(f"Candidate is missing label columns: {sorted(missing)}")
         return 1
 
-    scores = score_against_gold(candidate, gold)
-    macro_auc = scores["AUC"].mean()
+    merged = gold.merge(
+        candidate[["StudyInstanceUID", *LABELS]], on="StudyInstanceUID",
+        suffixes=("_gold", "_pred"),
+    )
+    truth = merged[[f"{label}_gold" for label in LABELS]].to_numpy().astype(int)
+    predicted = merged[[f"{label}_pred" for label in LABELS]].to_numpy().astype(float)
+    interval = bootstrap_macro_auc(truth, predicted)
+
+    is_binary = set(pd.unique(predicted.ravel())) <= {0.0, 1.0}
     covered = len(set(train.StudyInstanceUID) & set(candidate.StudyInstanceUID))
 
     lines = [
         "# Classification review",
         "",
         f"Candidate: `{args.candidate.name}` — {len(candidate):,} rows, "
-        f"covering {covered:,} of the {len(train):,} training studies.",
+        f"covering {covered:,} of the {len(train):,} training studies. "
+        f"{len(merged)} gold studies matched.",
         "",
-        f"## Macro-AUC against the 58 gold studies: **{macro_auc:.3f}**",
+        f"## Macro-AUC: **{interval['macro_auc']:.3f}**  "
+        f"(95% interval {interval['ci_low']:.3f} to {interval['ci_high']:.3f})",
         "",
-        "0.500 is a coin flip. Because the labels are binary, each AUC here is the "
-        "mean of that label's sensitivity and specificity.",
-        "",
-        scores.to_markdown(index=False, floatfmt=".3f"),
+        "0.500 is a coin flip. The interval comes from resampling studies, and it is "
+        f"{interval['ci_width']:.3f} wide — so a rival label set must beat this by "
+        f"more than about {interval['ci_width'] / 2:.2f} before the difference is "
+        "real rather than noise.",
         "",
     ]
+
+    if is_binary:
+        lines += [
+            "The candidate is binary 0/1, so each AUC below is the mean of that "
+            "label's sensitivity and specificity. Graded confidences would score "
+            "higher at identical decisions — see `docs/findings-02-classification-review.md`.",
+            "",
+            score_against_gold(candidate, gold).to_markdown(index=False, floatfmt=".3f"),
+            "",
+        ]
 
     if args.language_column in candidate.columns:
         by_language = score_by_language(candidate, args.language_column)

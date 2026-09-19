@@ -1,10 +1,12 @@
 # Classification review
 
-Candidate: `train_classified.xlsx` — 4,407 rows, covering 4,407 of the 4,407 training studies.
+Candidate: `train_classified.xlsx` — 4,407 rows, covering 4,407 of the 4,407 training studies. 58 gold studies matched.
 
-## Macro-AUC against the 58 gold studies: **0.643**
+## Macro-AUC: **0.643**  (95% interval 0.590 to 0.698)
 
-0.500 is a coin flip. Because the labels are binary, each AUC here is the mean of that label's sensitivity and specificity.
+0.500 is a coin flip. The interval comes from resampling studies, and it is 0.108 wide — so a rival label set must beat this by more than about 0.05 before the difference is real rather than noise.
+
+The candidate is binary 0/1, so each AUC below is the mean of that label's sensitivity and specificity. Graded confidences would score higher at identical decisions — see `docs/findings-02-classification-review.md`.
 
 | label            |   gold positives |   predicted |   TP |   FN |   FP |   TN |   sensitivity |   specificity |   AUC |
 |:-----------------|-----------------:|------------:|-----:|-----:|-----:|-----:|--------------:|--------------:|------:|
